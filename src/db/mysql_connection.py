@@ -47,7 +47,6 @@ class MySQLConnector:
         except Exception as e:
             logger.error("Other error SQL: {}".format(sql))
             logger.error(e)
-            raise
 
     def __gen_insert_sql(self, record: dict) -> str:
         table_name = record["table"]
