@@ -12,7 +12,9 @@ logger.setLevel(os.environ.get("LOG_LEVEL", "WARN"))
 def handle_event(event, context):
     raw_records = event["Records"]
     records = deaggregate_records(raw_records)
+    mysql = None
     for record in records:
         payload = json.loads(base64.b64decode(record["kinesis"]["data"]).decode()) # noqa
-        mysql = MySQLConnector(payload["database"])
+        if mysql is None:
+            mysql = MySQLConnector(payload["database"])
         mysql.process_row(payload)

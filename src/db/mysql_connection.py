@@ -29,11 +29,9 @@ class MySQLConnector:
         if data["type"] == "insert" or data["type"] == "bootstrap-insert":
             sql = self.__gen_insert_sql(data)
             self.__execute_query(sql)
-            # self.connection.commit()
         elif data["type"] == "update":
             sql = self.__gen_update_sql(data)
             self.__execute_query(sql)
-            # self.connection.commit()
         else:
             logger.error("Unsupported DDL/DML operation: {}".format(data["type"])) # noqa
             logger.error("data dict for unsupported operation:  {}".format(json.dumps(data))) # noqa
