@@ -1,0 +1,68 @@
+service: maxwell-kinesis-consumer
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: ${opt:stage, 'prod'}
+  timeout: 120
+  logRetentionInDays: 7
+  versionFunctions: false
+  region: ${self:custom.configFile.region}
+  iamRoleStatements: ${file(./config/iamRoles.yml)}
+  vpc:
+    securityGroupIds:
+      - sg-d2dcc5b7
+    subnetIds:
+      - subnet-e095b5a6
+      - subnet-31a12b59
+      - subnet-86e7f8ee
+  
+  environment:
+    LOG_LEVEL: WARN
+
+custom:
+  configFile: ${file(./config/${self:provider.stage}.yml)}
+  pythonRequirements:
+    noDeploy:
+      - boto3
+    usePoetry: true
+    slim: true
+
+plugins:
+  - serverless-python-requirements
+
+package:
+  exclude:
+    - .venv/**
+    - config/**
+    - node_modules/**    
+    - sql/**
+    - README.md
+    - .gitignore
+    - .idea/**
+    - .vscode/**
+    - .serverless
+    - serverless.yml
+    - .git/**
+    - test/**
+    - poetry.lock
+    - poetry.toml
+    - pyproject.toml
+    - requirements.txt
+  include:
+    - src/**
+
+functions:
+  maxwell_kinesis_handler:
+    name: maxwell_kinesis_handler
+    handler: src/handlers/maxwell_kinesis_handler.handle_event
+    memorySize: 2048
+    timeout: 300
+    vpc: vpc-3aa12b52
+    events:
+      - stream:
+         batchSize: 500
+         startingPosition: LATEST
+         parallelizationFactor: 10
+         type: kinesis
+         arn: arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-db-replication

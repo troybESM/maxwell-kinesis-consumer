@@ -1,0 +1,14 @@
+- Effect: Allow
+  Action:
+    - kinesis:GetRecords
+    - kinesis:GetShardIterator
+    - kinesis:DescribeStream
+    - kinesis:DescribeStreamSummary
+    - kinesis:SubscribeToShard
+    - kinesis:ListShards
+    - kinesis:ListStreams
+  Resource: "arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-db-replication"
+- Effect: Allow
+  Action:
+    - secretsmanager:GetSecretValue
+  Resource: "*"
