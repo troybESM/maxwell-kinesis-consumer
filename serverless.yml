@@ -61,7 +61,7 @@ functions:
     vpc: vpc-3aa12b52
     events:
       - stream:
-         batchSize: 500
+         batchSize: 100
          startingPosition: LATEST
          parallelizationFactor: 10
          type: kinesis

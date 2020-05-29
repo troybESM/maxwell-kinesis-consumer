@@ -18,3 +18,4 @@ def handle_event(event, context):
         if mysql is None:
             mysql = MySQLConnector(payload["database"])
         mysql.process_row(payload)
+    mysql.commit_all()

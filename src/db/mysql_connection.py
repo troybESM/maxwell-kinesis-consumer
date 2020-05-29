@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 from pymysql import connect, IntegrityError, ProgrammingError, escape_string
@@ -6,19 +7,20 @@ from pymysql.cursors import Cursor
 from src.utils import get_secret
 
 logger = logging.getLogger()
-logger.setLevel("DEBUG")
+logger.setLevel(os.environ.get("LOG_LEVEL", "WARN"))
 
 
 class MySQLConnector:
     def __init__(self, db_name):
         secret_string = get_secret("fmgmt-c1-maxwell")
         self.database_name = db_name
+        self.sql_statements = list()
         self.connection: Connection = connect(
             host="px-fmgmt-c1.proxy-cq8zuscratld.us-west-2.rds.amazonaws.com",
             user=secret_string["username"],
             passwd=secret_string["password"],
             port=secret_string["port"],
-            autocommit=True,
+            autocommit=False,
             db=db_name
         )
         self.cursor: Cursor = self.connection.cursor(Cursor)
@@ -28,13 +30,26 @@ class MySQLConnector:
         sql = ""
         if data["type"] == "insert" or data["type"] == "bootstrap-insert":
             sql = self.__gen_insert_sql(data)
-            self.__execute_query(sql)
+            self.sql_statements.append(sql)
         elif data["type"] == "update":
             sql = self.__gen_update_sql(data)
-            self.__execute_query(sql)
+            self.sql_statements.append(sql)
         else:
             logger.error("Unsupported DDL/DML operation: {}".format(data["type"])) # noqa
             logger.error("data dict for unsupported operation:  {}".format(json.dumps(data))) # noqa
+
+    def commit_all(self):
+        logger.debug("Commmiting all SQL")
+        logger.warn("Length of sql list: {}".format(len(self.sql_statements)))
+        try:
+            for sql in self.sql_statements:
+                self.__execute_query(sql)
+            self.connection.commit()
+            self.cursor.close()
+            self.connection.close()
+        except Exception as e:
+            logger.error("Exception commiting all")
+            logger.error(e)
 
     def __execute_query(self, sql: str) -> None:
         logger.debug("__execute query sql: {} ".format(sql))
@@ -87,6 +102,7 @@ class MySQLConnector:
 
     @staticmethod
     def gen_insert_col_list(record: dict) -> str:
+        # yeah, this one hurt 
         column_str = '`' + ' '.join(map(str, (k for k in record["data"]))).replace(' ', ",").replace(',', ', `').replace(',', '`,') + '`' # noqa
         logger.debug("column string: {}".format(column_str))
         return column_str
