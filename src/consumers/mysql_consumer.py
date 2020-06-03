@@ -32,7 +32,7 @@ class MySQLConsumer:
         elif data["type"] == constants.MAXWELL_UPDATE_OP:
             sql = self.__gen_update_sql(data)
         elif data["type"] == constants.MAXWELL_DELETE_OP:
-            sql = self.__gen_delete_sql
+            sql = self.__gen_delete_sql(data)
         elif data["type"] == constants.MAXWELL_TABLE_CREATE_OP or data["type"] == constants.MAXWELL_TABLE_ALTER_OP: # noqa
             sql = data["sql"]
             logger.debug("SQL for DDL operation: {}".format(sql))
