@@ -14,47 +14,45 @@ class MySQLConnector:
     def __init__(self, db_name):
         secret_string = get_secret("fmgmt-c1-maxwell")
         self.database_name = db_name
-        self.sql_statements = list()
-        self.connection: Connection = connect(
-            host="px-fmgmt-c1.proxy-cq8zuscratld.us-west-2.rds.amazonaws.com",
+        self.__connection: Connection = connect(
+            host="fmgmt-c1-replica.cluster-cq8zuscratld.us-west-2.rds.amazonaws.com", # noqa
             user=secret_string["username"],
             passwd=secret_string["password"],
             port=secret_string["port"],
-            autocommit=False,
+            autocommit=True,
             db=db_name
         )
-        self.cursor: Cursor = self.connection.cursor(Cursor)
+        self.__cursor: Cursor = self.__connection.cursor(Cursor)
 
     def process_row(self, data: dict) -> None:
         logger.debug("process_row, database = {}".format(data["database"]))
         sql = ""
         if data["type"] == "insert" or data["type"] == "bootstrap-insert":
             sql = self.__gen_insert_sql(data)
-            self.sql_statements.append(sql)
         elif data["type"] == "update":
             sql = self.__gen_update_sql(data)
-            self.sql_statements.append(sql)
         else:
             logger.error("Unsupported DDL/DML operation: {}".format(data["type"])) # noqa
             logger.error("data dict for unsupported operation:  {}".format(json.dumps(data))) # noqa
+            return
 
-    def commit_all(self):
-        logger.debug("Commmiting all SQL")
-        logger.warn("Length of sql list: {}".format(len(self.sql_statements)))
+        if len(sql) > 0:
+            self.__execute_statement(sql)
+        else:
+            logger.error("How did we get here, SQL stmt length is ZERO!")
+
+    def close(self):
         try:
-            for sql in self.sql_statements:
-                self.__execute_query(sql)
-            self.connection.commit()
-            self.cursor.close()
-            self.connection.close()
+            self.__cursor.close()
+            self.__connection.close()
         except Exception as e:
-            logger.error("Exception commiting all")
+            logger.error("Error closing")
             logger.error(e)
 
-    def __execute_query(self, sql: str) -> None:
-        logger.debug("__execute query sql: {} ".format(sql))
+    def __execute_statement(self, sql):
+        logger.debug("Commmiting SQL")
         try:
-            self.cursor.execute(sql)
+            self.__cursor.execute(sql)
         except (IntegrityError, ProgrammingError) as error:
             logger.error("Integrity/Programming error SQL: {}".format(sql))
             logger.error(error)
@@ -65,7 +63,7 @@ class MySQLConnector:
 
     def __gen_insert_sql(self, record: dict) -> str:
         table_name = record["table"]
-        sql = "INSERT INTO {} ( {} ) VALUES ( {} )".format(table_name,
+        sql = "INSERT IGNORE INTO {} ( {} ) VALUES ( {} )".format(table_name,
                                                 self.gen_insert_col_list(record), # noqa
                                                 self.gen_insert_value_list(record)) # noqa
         logger.debug("Generated SQL for insert: {}".format(sql))
@@ -102,7 +100,7 @@ class MySQLConnector:
 
     @staticmethod
     def gen_insert_col_list(record: dict) -> str:
-        # yeah, this one hurt 
+        # yeah, this one hurt
         column_str = '`' + ' '.join(map(str, (k for k in record["data"]))).replace(' ', ",").replace(',', ', `').replace(',', '`,') + '`' # noqa
         logger.debug("column string: {}".format(column_str))
         return column_str

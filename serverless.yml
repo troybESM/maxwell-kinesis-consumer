@@ -57,12 +57,13 @@ functions:
     name: maxwell_kinesis_handler
     handler: src/handlers/maxwell_kinesis_handler.handle_event
     memorySize: 2048
-    timeout: 300
+    timeout: 600
     vpc: vpc-3aa12b52
     events:
       - stream:
-         batchSize: 100
+         batchSize: 1000
          startingPosition: LATEST
          parallelizationFactor: 10
+         maximumRetryAttempts: 1
          type: kinesis
-         arn: arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-db-replication
+         arn: arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-c1-db-replication

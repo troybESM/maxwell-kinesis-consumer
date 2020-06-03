@@ -13,9 +13,13 @@ def handle_event(event, context):
     raw_records = event["Records"]
     records = deaggregate_records(raw_records)
     mysql = None
+    i = 0
     for record in records:
         payload = json.loads(base64.b64decode(record["kinesis"]["data"]).decode()) # noqa
         if mysql is None:
             mysql = MySQLConnector(payload["database"])
         mysql.process_row(payload)
-    mysql.commit_all()
+        i = i + 1
+
+    logger.warn("Number of records processed: {} ".format(str(i)))
+    mysql.close()
