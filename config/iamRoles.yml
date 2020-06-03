@@ -7,7 +7,7 @@
     - kinesis:SubscribeToShard
     - kinesis:ListShards
     - kinesis:ListStreams
-  Resource: "arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-c1-db-replication"
+  Resource: "arn:aws:kinesis:us-west-2:302137437361:stream/maxwell*"
 - Effect: Allow
   Action:
     - secretsmanager:GetSecretValue

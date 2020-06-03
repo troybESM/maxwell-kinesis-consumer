@@ -1,0 +1,6 @@
+MAXWELL_INSERT_OP = "insert"
+MAXWELL_UPDATE_OP = "update"
+MAXWELL_DELETE_OP = "delete"
+MAXWELL_BOOTSTRAP_OP = "bootstrap-insert"
+MAXWELL_TABLE_CREATE_OP = "table-create"
+MAXWELL_TABLE_ALTER_OP = "table-alter"

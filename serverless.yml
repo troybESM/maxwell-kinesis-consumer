@@ -50,7 +50,7 @@ package:
     - pyproject.toml
     - requirements.txt
   include:
-    - src/**
+    - src/handlers/**
 
 functions:
   maxwell_kinesis_handler:
@@ -66,4 +66,4 @@ functions:
          parallelizationFactor: 10
          maximumRetryAttempts: 1
          type: kinesis
-         arn: arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-c1-db-replication
+         arn: arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-test-01

@@ -1,21 +1,21 @@
-import os
 import json
 import logging
 from pymysql import connect, IntegrityError, ProgrammingError, escape_string
 from pymysql.connections import Connection
 from pymysql.cursors import Cursor
 from src.utils import get_secret
+from src import constants
 
 logger = logging.getLogger()
-logger.setLevel(os.environ.get("LOG_LEVEL", "WARN"))
+logger.setLevel("DEBUG")
 
 
-class MySQLConnector:
+class MySQLConsumer:
     def __init__(self, db_name):
         secret_string = get_secret("fmgmt-c1-maxwell")
         self.database_name = db_name
         self.__connection: Connection = connect(
-            host="fmgmt-c1-replica.cluster-cq8zuscratld.us-west-2.rds.amazonaws.com", # noqa
+            host=secret_string["host"],
             user=secret_string["username"],
             passwd=secret_string["password"],
             port=secret_string["port"],
@@ -27,10 +27,15 @@ class MySQLConnector:
     def process_row(self, data: dict) -> None:
         logger.debug("process_row, database = {}".format(data["database"]))
         sql = ""
-        if data["type"] == "insert" or data["type"] == "bootstrap-insert":
+        if data["type"] == constants.MAXWELL_INSERT_OP or data["type"] == constants.MAXWELL_BOOTSTRAP_OP: # noqa
             sql = self.__gen_insert_sql(data)
-        elif data["type"] == "update":
+        elif data["type"] == constants.MAXWELL_UPDATE_OP:
             sql = self.__gen_update_sql(data)
+        elif data["type"] == constants.MAXWELL_DELETE_OP:
+            sql = self.__gen_delete_sql
+        elif data["type"] == constants.MAXWELL_TABLE_CREATE_OP or data["type"] == constants.MAXWELL_TABLE_ALTER_OP: # noqa
+            sql = data["sql"]
+            logger.debug("SQL for DDL operation: {}".format(sql))
         else:
             logger.error("Unsupported DDL/DML operation: {}".format(data["type"])) # noqa
             logger.error("data dict for unsupported operation:  {}".format(json.dumps(data))) # noqa
@@ -39,7 +44,7 @@ class MySQLConnector:
         if len(sql) > 0:
             self.__execute_statement(sql)
         else:
-            logger.error("How did we get here, SQL stmt length is ZERO!")
+            logger.fatal("How did we get here, SQL stmt length is ZERO!")
 
     def close(self):
         try:
@@ -72,7 +77,6 @@ class MySQLConnector:
     def __gen_update_sql(self, record: dict) -> str:
         table_name = record["table"]
         set_values = list()
-        where_values = list()
 
         for k, v in record["data"].items():
             if k not in record["primary_key_columns"]:
@@ -85,17 +89,16 @@ class MySQLConnector:
                 else:
                     set_values.append("`" + k + "`" + " = " + str(v)) # noqa
 
-        pk_len = len(record["primary_key_columns"])
-        for i in range(0, pk_len):
-            if isinstance(record["data"][record["primary_key_columns"][i]], str): # noqa
-                where_values.append(record["primary_key_columns"][i] + " = '" + record["data"][record["primary_key_columns"][i]] + "'") # noqa
-            else:
-                where_values.append(record["primary_key_columns"][i] + "=" + str(record["data"][record["primary_key_columns"][i]])) # noqa
-            if i < (pk_len - 1):
-                where_values.append(" AND ")
-
-        sql = "UPDATE {} SET {} WHERE {}".format(table_name, ", ".join(x for x in set_values), " ".join(x for x in where_values)) # noqa
+        sql = "UPDATE {} SET {} WHERE {}".format(table_name,
+                                                 ", ".join(x for x in set_values), # noqa
+                                                 " ".join(x for x in self.gen_where_pk_clause(record))) # noqa
         logger.debug("Generated SQL for update: {}".format(sql))
+        return sql
+
+    def __gen_delete_sql(self, record: dict) -> str:
+        table_name = record["table"]
+        sql = "DELETE FROM {} WHERE {}".format(table_name, " ".join(x for x in self.gen_where_pk_clause(record))) # noqa
+        logger.debug("Generated SQL for delete: {}".format(sql))
         return sql
 
     @staticmethod
@@ -119,3 +122,16 @@ class MySQLConnector:
                 logger.debug("value: {}".format(v))
                 values.append("'" + escape_string(v) + "'")
         return ", ".join(x for x in values)
+
+    @staticmethod
+    def gen_where_pk_clause(record: dict) -> list:
+        where_values = list()
+        pk_len = len(record["primary_key_columns"])
+        for i in range(0, pk_len):
+            if isinstance(record["data"][record["primary_key_columns"][i]], str): # noqa
+                where_values.append(record["primary_key_columns"][i] + " = '" + record["data"][record["primary_key_columns"][i]] + "'") # noqa
+            else:
+                where_values.append(record["primary_key_columns"][i] + "=" + str(record["data"][record["primary_key_columns"][i]])) # noqa
+            if i < (pk_len - 1):
+                where_values.append(" AND ")
+        return where_values
