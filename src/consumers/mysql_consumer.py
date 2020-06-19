@@ -3,7 +3,6 @@ import logging
 from pymysql import connect, IntegrityError, ProgrammingError, escape_string
 from pymysql.connections import Connection
 from pymysql.cursors import Cursor
-from src.utils import get_secret
 from src import constants
 
 logger = logging.getLogger()
@@ -11,18 +10,23 @@ logger.setLevel("DEBUG")
 
 
 class MySQLConsumer:
-    def __init__(self, db_name):
-        secret_string = get_secret("fmgmt-c1-maxwell")
+    def __init__(self, db_name, secret_string, split_writes=False):
         self.database_name = db_name
-        self.__connection: Connection = connect(
-            host=secret_string["host"],
-            user=secret_string["username"],
-            passwd=secret_string["password"],
-            port=secret_string["port"],
-            autocommit=True,
-            db=db_name
-        )
-        self.__cursor: Cursor = self.__connection.cursor(Cursor)
+        self.split_writes = split_writes
+        self.connections = list()
+        self.cursors = list()
+        logger.debug("secret string: {}".format(secret_string))
+        for host in secret_string["hosts"]:
+            connection: Connection = connect(
+                host=host,
+                user=secret_string["username"],
+                passwd=secret_string["password"],
+                port=secret_string["port"],
+                autocommit=True,
+                db=db_name
+            )
+            self.connections.append(connection)
+            self.cursors.append(connection.cursor(Cursor))
 
     def process_row(self, data: dict) -> None:
         logger.debug("process_row, database = {}".format(data["database"]))
@@ -46,25 +50,35 @@ class MySQLConsumer:
         else:
             logger.fatal("How did we get here, SQL stmt length is ZERO!")
 
-    def close(self):
-        try:
-            self.__cursor.close()
-            self.__connection.close()
-        except Exception as e:
-            logger.error("Error closing")
-            logger.error(e)
+        if self.split_writes:
+            pass
 
-    def __execute_statement(self, sql):
+    def close(self) -> None:
+        for cursor in self.cursors:
+            try:
+                cursor.close()
+            except Exception as e:
+                logger.error("Error closing cursor for host") # noqa
+                logger.error(e)
+        for connection in self.connections:
+            try:
+                connection.close()
+            except Exception as e:
+                logger.error("Error closing connect for host") # noqa
+                logger.error(e)
+
+    def __execute_statement(self, sql) -> None:
         logger.debug("Commmiting SQL")
-        try:
-            self.__cursor.execute(sql)
-        except (IntegrityError, ProgrammingError) as error:
-            logger.error("Integrity/Programming error SQL: {}".format(sql))
-            logger.error(error)
-            # send to DLQ ?
-        except Exception as e:
-            logger.error("Other error SQL: {}".format(sql))
-            logger.error(e)
+        for cursor in self.cursors:
+            try:
+                cursor.execute(sql)
+            except (IntegrityError, ProgrammingError) as error:
+                logger.error("Integrity/Programming error SQL: {}".format(sql)) # noqa
+                logger.error(error)
+                # send to DLQ ?
+            except Exception as e:
+                logger.error("Other error SQL: {}".format(sql)) # noqa
+                logger.error(e)
 
     def __gen_insert_sql(self, record: dict) -> str:
         table_name = record["table"]
@@ -101,9 +115,12 @@ class MySQLConsumer:
         logger.debug("Generated SQL for delete: {}".format(sql))
         return sql
 
+    def __get_split_write_tables():
+        # sql = "SELECT database, source_table_name, destination_table_name FROM maxwell-metadata" # noqa
+        pass
+
     @staticmethod
     def gen_insert_col_list(record: dict) -> str:
-        # yeah, this one hurt
         column_str = '`' + ' '.join(map(str, (k for k in record["data"]))).replace(' ', ",").replace(',', ', `').replace(',', '`,') + '`' # noqa
         logger.debug("column string: {}".format(column_str))
         return column_str

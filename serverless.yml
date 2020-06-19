@@ -18,7 +18,7 @@ provider:
       - subnet-86e7f8ee
   
   environment:
-    LOG_LEVEL: WARN
+    LOG_LEVEL: INFO
 
 custom:
   configFile: ${file(./config/${self:provider.stage}.yml)}
@@ -55,7 +55,7 @@ package:
 functions:
   maxwell_kinesis_handler:
     name: maxwell_kinesis_handler
-    handler: src/handlers/maxwell_kinesis_handler.handle_event
+    handler: src/handlers/maxwell_kinesis_mysql.handle_event
     memorySize: 2048
     timeout: 600
     vpc: vpc-3aa12b52
@@ -64,6 +64,6 @@ functions:
          batchSize: 1000
          startingPosition: LATEST
          parallelizationFactor: 10
-         maximumRetryAttempts: 1
+         maximumRetryAttempts: 100
          type: kinesis
-         arn: arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-test-01
+         arn: arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-index-test-01
