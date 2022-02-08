@@ -1,4 +1,4 @@
-service: maxwell-kinesis-consumer-dev-c1
+service: maxwell-kinesis-consumer-access-tokens
 
 provider:
   name: aws
