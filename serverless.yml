@@ -1,36 +1,43 @@
-service: maxwell-kinesis-consumer
+service: maxwell-kinesis-consumer-access-tokens
 
 provider:
   name: aws
-  runtime: python3.8
+  runtime: python3.9
   stage: ${opt:stage, 'prod'}
   timeout: 120
   logRetentionInDays: 7
   versionFunctions: false
   region: ${self:custom.configFile.region}
+  deploymentBucket:
+    name: hsl-${opt:stage}-serverless
   iamRoleStatements: ${file(./config/iamRoles.yml)}
   vpc:
-    securityGroupIds:
-      - sg-d2dcc5b7
-    subnetIds:
-      - subnet-e095b5a6
-      - subnet-31a12b59
-      - subnet-86e7f8ee
-  
+    securityGroupIds: ${self:custom.vpcSecurityGroups.${self:provider.stage}}
+    subnetIds: ${self:custom.vpcSubnetIds.${self:provider.stage}}
   environment:
     LOG_LEVEL: INFO
+    CLUSTER_NAME: 'pnw-dev'
 
+resources: ${file(./config/resources.yml)}
 custom:
   configFile: ${file(./config/${self:provider.stage}.yml)}
   pythonRequirements:
-    noDeploy:
-      - boto3
-    usePoetry: true
-    slim: true
-
+    dockerPip: non-linux
+  vpcSecurityGroups:
+    dev: sg-48944132
+    prod: sg-d2dcc5b7
+  vpcSubnetIds:
+    dev:
+      - subnet-afd4f8e6
+      - subnet-41392c26
+      - subnet-71dc742a
+    prod: 
+      - subnet-e095b5a6
+      - subnet-31a12b59
+      - subnet-86e7f8ee
 plugins:
   - serverless-python-requirements
-
+  - serverless-deployment-bucket
 package:
   exclude:
     - .venv/**
@@ -58,12 +65,11 @@ functions:
     handler: src/handlers/maxwell_kinesis_mysql.handle_event
     memorySize: 2048
     timeout: 600
-    vpc: vpc-3aa12b52
     events:
       - stream:
-         batchSize: 1000
-         startingPosition: LATEST
-         parallelizationFactor: 10
-         maximumRetryAttempts: 100
-         type: kinesis
-         arn: arn:aws:kinesis:us-west-2:302137437361:stream/maxwell-index-test-01
+          batchSize: 1000
+          startingPosition: LATEST
+          parallelizationFactor: 10
+          maximumRetryAttempts: 100
+          type: kinesis
+          arn: !GetAtt MaxwellStream.Arn

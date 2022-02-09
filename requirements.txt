@@ -1,0 +1,3 @@
+aws_kinesis_agg
+boto3_type_annotations
+pymysql == 0.10.1

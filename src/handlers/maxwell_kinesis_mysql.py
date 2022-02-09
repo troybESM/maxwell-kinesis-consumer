@@ -21,9 +21,9 @@ def handle_event(event, context):
         payload = json.loads(base64.b64decode(record["kinesis"]["data"]).decode()) # noqa
         if secret_string is None:
             try:
-                secret_string = get_secret("maxwell/{}".format(payload["database"])) # noqa
+                secret_string = get_secret(f"/maxwell/{os.environ.get('CLUSTER_NAME')}") # noqa
             except Exception:
-                logger.warn("No secret found for table, ignoring")
+                logger.warn(f"No secret found for table, ignoring. Cluster: /maxwell/{os.environ.get('CLUSTER_NAME')}")
                 return
 
         if mysql is None:

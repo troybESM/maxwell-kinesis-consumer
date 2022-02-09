@@ -1,0 +1,13 @@
+Resources:
+  MaxwellStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: ${self:service}
+      StreamModeDetails:
+        StreamMode: ON_DEMAND
+  StreamArnParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /${opt:stage, self:provider.stage}/kinesis/${self:service}
+      Type: String
+      Value: !GetAtt MaxwellStream.Arn

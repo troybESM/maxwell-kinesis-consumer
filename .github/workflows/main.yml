@@ -1,0 +1,37 @@
+name: Deploy master branch
+
+permissions:
+  id-token: write # required to use OIDC authentication
+  contents: read # required to checkout the code from the repo
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    # strategy:
+    #   matrix:
+    #     node-version: [14.x, 16.x]
+    steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: arn:aws:iam::590762009186:role/GithubActionsDeployRole
+        role-duration-seconds: 900 
+        aws-region: us-west-2
+    - name: S3 List
+      run: aws s3 ls
+    - uses: actions/checkout@v2
+    - name: Use Node.js 16.x
+      uses: actions/setup-node@v1
+      with:
+        node-version: 16.x
+    - run: npm ci
+    - name: serverless deploy
+      uses: serverless/github-action@v3
+      with:
+        args: deploy --stage dev
